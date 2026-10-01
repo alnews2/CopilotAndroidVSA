@@ -1,7 +1,8 @@
 package com.example.copilotandroidvsa.ui.screen
 
 import android.Manifest
-import android.annotation.SuppressLint
+import android.graphics.PointF
+import android.os.Bundle
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.camera.core.Camera
@@ -11,7 +12,6 @@ import androidx.camera.core.ZoomState
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,7 +41,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -151,10 +150,11 @@ private fun CameraPreview(
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
     currentZoom: Float,
     onZoomChange: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var camera by remember { mutableStateOf<Camera?>(null) }
-    var pinchDistance by remember { mutableStateOf(0f) }
+    var pinchStartDistance by remember { mutableStateOf(0f) }
+    var initialZoom by remember { mutableFloatStateOf(1f) }
 
     key(lensFacing) {
         AndroidView(
@@ -165,6 +165,36 @@ private fun CameraPreview(
                 }
 
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+
+                val listener = object : PreviewView.OnTouchListener {
+                    override fun onTouch(v: android.view.View, event: MotionEvent): Boolean {
+                        when (event.actionMasked) {
+                            MotionEvent.ACTION_POINTER_DOWN -> {
+                                if (event.pointerCount >= 2) {
+                                    pinchStartDistance = getDistance(event)
+                                    initialZoom = currentZoom
+                                }
+                            }
+                            MotionEvent.ACTION_MOVE -> {
+                                if (event.pointerCount >= 2) {
+                                    val distance = getDistance(event)
+                                    if (pinchStartDistance > 0f && distance > 0f) {
+                                        val ratio = (distance / pinchStartDistance)
+                                        val zoomValue = (initialZoom * ratio).coerceIn(1f, 5f)
+                                        camera?.cameraControl?.setZoomRatio(zoomValue)
+                                        onZoomChange(zoomValue)
+                                    }
+                                }
+                            }
+                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                                pinchStartDistance = 0f
+                            }
+                        }
+                        return true
+                    }
+                }
+
+                previewView.setOnTouchListener(listener)
 
                 cameraProviderFuture.addListener({
                     try {
@@ -178,7 +208,7 @@ private fun CameraPreview(
                             .build()
 
                         camera = cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
-                        camera?.cameraControl?.setLinearZoom(currentZoom / 4f)
+                        camera?.cameraControl?.setZoomRatio(currentZoom)
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -186,23 +216,24 @@ private fun CameraPreview(
 
                 previewView
             },
-            modifier = modifier.pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        // no-op: réservé à de futures interactions
-                    }
-                )
-            }
+            modifier = modifier
         )
     }
 
-    DisposableEffect(lensFacing, currentZoom) {
+    DisposableEffect(lensFacing) {
         if (camera != null) {
-            camera?.cameraControl?.setLinearZoom((currentZoom - 1f).coerceIn(0f, 2f) / 4f)
+            camera?.cameraControl?.setZoomRatio(currentZoom)
         }
         onDispose { }
     }
+}
 
-    // Gestion du pinch-to-zoom via l'API MotionEvent directement sur le composant AndroidView
-    // Cette version n'ajoute pas de logique pure Compose, mais permet l'interaction tactile sur le PreviewView.
+private fun getDistance(event: MotionEvent): Float {
+    val x1 = event.getX(0)
+    val y1 = event.getY(0)
+    val x2 = event.getX(1)
+    val y2 = event.getY(1)
+    val dx = x2 - x1
+    val dy = y2 - y1
+    return kotlin.math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
 }
