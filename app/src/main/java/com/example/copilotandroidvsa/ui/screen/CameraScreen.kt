@@ -1,17 +1,15 @@
 package com.example.copilotandroidvsa.ui.screen
 
 import android.Manifest
-import android.graphics.PointF
-import android.os.Bundle
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
-import androidx.camera.core.ZoomState
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -49,6 +46,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberPermissionState
+import kotlin.math.sqrt
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -56,8 +54,6 @@ fun CameraScreen() {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     var lensFacing by rememberSaveable { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var menuExpanded by remember { mutableStateOf(false) }
@@ -91,6 +87,7 @@ fun CameraScreen() {
                             tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
+
                     DropdownMenu(
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false }
@@ -130,10 +127,11 @@ fun CameraScreen() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+            verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("Permission caméra requise", style = MaterialTheme.typography.headlineSmall)
+
             Button(
                 onClick = { cameraPermissionState.launchPermissionRequest() },
                 modifier = Modifier.padding(top = 16.dp)
@@ -150,82 +148,79 @@ private fun CameraPreview(
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
     currentZoom: Float,
     onZoomChange: (Float) -> Unit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     var camera by remember { mutableStateOf<Camera?>(null) }
     var pinchStartDistance by remember { mutableStateOf(0f) }
     var initialZoom by remember { mutableFloatStateOf(1f) }
 
-    key(lensFacing) {
-        AndroidView(
-            factory = { context ->
-                val previewView = PreviewView(context).apply {
-                    scaleType = PreviewView.ScaleType.FILL_CENTER
-                    implementationMode = PreviewView.ImplementationMode.PERFORMANCE
-                }
-
-                val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-
-                val listener = object : PreviewView.OnTouchListener {
-                    override fun onTouch(v: android.view.View, event: MotionEvent): Boolean {
-                        when (event.actionMasked) {
-                            MotionEvent.ACTION_POINTER_DOWN -> {
-                                if (event.pointerCount >= 2) {
-                                    pinchStartDistance = getDistance(event)
-                                    initialZoom = currentZoom
-                                }
-                            }
-                            MotionEvent.ACTION_MOVE -> {
-                                if (event.pointerCount >= 2) {
-                                    val distance = getDistance(event)
-                                    if (pinchStartDistance > 0f && distance > 0f) {
-                                        val ratio = (distance / pinchStartDistance)
-                                        val zoomValue = (initialZoom * ratio).coerceIn(1f, 5f)
-                                        camera?.cameraControl?.setZoomRatio(zoomValue)
-                                        onZoomChange(zoomValue)
-                                    }
-                                }
-                            }
-                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                                pinchStartDistance = 0f
-                            }
-                        }
-                        return true
-                    }
-                }
-
-                previewView.setOnTouchListener(listener)
-
-                cameraProviderFuture.addListener({
-                    try {
-                        val cameraProvider = cameraProviderFuture.get()
-                        val preview = Preview.Builder().build().also {
-                            it.setSurfaceProvider(previewView.surfaceProvider)
-                        }
-
-                        val cameraSelector = CameraSelector.Builder()
-                            .requireLensFacing(lensFacing)
-                            .build()
-
-                        camera = cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
-                        camera?.cameraControl?.setZoomRatio(currentZoom)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }, ContextCompat.getMainExecutor(context))
-
-                previewView
-            },
-            modifier = modifier
-        )
-    }
-
     DisposableEffect(lensFacing) {
         if (camera != null) {
-            camera?.cameraControl?.setZoomRatio(currentZoom)
+            camera?.cameraControl?.setZoomRatio(currentZoom.coerceIn(1f, 5f))
         }
         onDispose { }
     }
+
+    AndroidView(
+        factory = { context ->
+            val previewView = PreviewView(context).apply {
+                scaleType = PreviewView.ScaleType.FILL_CENTER
+                implementationMode = PreviewView.ImplementationMode.PERFORMANCE
+            }
+
+            previewView.setOnTouchListener { _, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_POINTER_DOWN -> {
+                        if (event.pointerCount >= 2) {
+                            pinchStartDistance = getDistance(event)
+                            initialZoom = currentZoom
+                        }
+                    }
+
+                    MotionEvent.ACTION_MOVE -> {
+                        if (event.pointerCount >= 2) {
+                            val distance = getDistance(event)
+                            if (pinchStartDistance > 0f && distance > 0f) {
+                                val ratio = distance / pinchStartDistance
+                                val nextZoom = (initialZoom * ratio).coerceIn(1f, 5f)
+                                camera?.cameraControl?.setZoomRatio(nextZoom)
+                                onZoomChange(nextZoom)
+                            }
+                        }
+                    }
+
+                    MotionEvent.ACTION_UP,
+                    MotionEvent.ACTION_CANCEL -> {
+                        pinchStartDistance = 0f
+                    }
+                }
+                true
+            }
+
+            val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+
+            cameraProviderFuture.addListener({
+                try {
+                    val cameraProvider = cameraProviderFuture.get()
+                    val preview = Preview.Builder().build().also {
+                        it.setSurfaceProvider(previewView.surfaceProvider)
+                    }
+
+                    val selector = CameraSelector.Builder()
+                        .requireLensFacing(lensFacing)
+                        .build()
+
+                    camera = cameraProvider.bindToLifecycle(lifecycleOwner, selector, preview)
+                    camera?.cameraControl?.setZoomRatio(currentZoom.coerceIn(1f, 5f))
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }, ContextCompat.getMainExecutor(context))
+
+            previewView
+        },
+        modifier = modifier
+    )
 }
 
 private fun getDistance(event: MotionEvent): Float {
@@ -235,5 +230,5 @@ private fun getDistance(event: MotionEvent): Float {
     val y2 = event.getY(1)
     val dx = x2 - x1
     val dy = y2 - y1
-    return kotlin.math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+    return sqrt((dx * dx + dy * dy).toDouble()).toFloat()
 }
