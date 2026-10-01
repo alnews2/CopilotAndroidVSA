@@ -181,8 +181,8 @@ private fun CameraPreview(
                         if (event.pointerCount >= 2) {
                             val distance = getDistance(event)
                             if (pinchStartDistance > 0f && distance > 0f) {
-                                val ratio = distance / pinchStartDistance
-                                val nextZoom = (initialZoom * ratio).coerceIn(1f, 5f)
+                                val factor = distance / pinchStartDistance
+                                val nextZoom = (initialZoom * factor).coerceIn(1f, 5f)
                                 camera?.cameraControl?.setZoomRatio(nextZoom)
                                 onZoomChange(nextZoom)
                             }
