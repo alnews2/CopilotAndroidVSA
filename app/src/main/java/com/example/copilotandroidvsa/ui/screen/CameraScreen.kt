@@ -58,6 +58,8 @@ fun CameraScreen() {
     var lensFacing by rememberSaveable { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var menuExpanded by remember { mutableStateOf(false) }
     var currentZoom by rememberSaveable { mutableFloatStateOf(1f) }
+    var panX by rememberSaveable { mutableFloatStateOf(0f) }
+    var panY by rememberSaveable { mutableFloatStateOf(0f) }
 
     LaunchedEffect(Unit) {
         cameraPermissionState.launchPermissionRequest()
@@ -74,7 +76,13 @@ fun CameraScreen() {
                     lensFacing = lensFacing,
                     lifecycleOwner = lifecycleOwner,
                     currentZoom = currentZoom,
+                    panX = panX,
+                    panY = panY,
                     onZoomChange = { currentZoom = it },
+                    onPanChange = { nextPanX, nextPanY ->
+                        panX = nextPanX
+                        panY = nextPanY
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -149,19 +157,28 @@ private fun CameraPreview(
     lensFacing: Int,
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
     currentZoom: Float,
+    panX: Float,
+    panY: Float,
     onZoomChange: (Float) -> Unit,
+    onPanChange: (Float, Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var camera by remember { mutableStateOf<Camera?>(null) }
     var pinchStartDistance by remember { mutableStateOf(0f) }
     var startZoom by remember { mutableFloatStateOf(1f) }
     var lastTapTime by remember { mutableLongStateOf(0L) }
+    var dragStartX by remember { mutableFloatStateOf(0f) }
+    var dragStartY by remember { mutableFloatStateOf(0f) }
+    var panStartX by remember { mutableFloatStateOf(0f) }
+    var panStartY by remember { mutableFloatStateOf(0f) }
 
     AndroidView(
         factory = { context ->
             val previewView = PreviewView(context).apply {
                 scaleType = PreviewView.ScaleType.FILL_CENTER
                 implementationMode = PreviewView.ImplementationMode.PERFORMANCE
+                translationX = panX
+                translationY = panY
             }
 
             val currentZoomRef = mutableStateOf(currentZoom)
@@ -169,6 +186,13 @@ private fun CameraPreview(
             previewView.setOnTouchListener { _, event ->
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
+                        if (event.pointerCount == 1) {
+                            dragStartX = event.x
+                            dragStartY = event.y
+                            panStartX = panX
+                            panStartY = panY
+                        }
+
                         if (event.eventTime - lastTapTime < DOUBLE_TAP_THRESHOLD_MS && event.pointerCount == 1) {
                             val resetZoom = 1f
                             camera?.cameraControl?.setZoomRatio(resetZoom)
@@ -196,6 +220,15 @@ private fun CameraPreview(
                                 currentZoomRef.value = nextZoom
                                 onZoomChange(nextZoom)
                             }
+                        } else if (event.pointerCount == 1) {
+                            val dx = event.x - dragStartX
+                            val dy = event.y - dragStartY
+                            val maxPan = getMaxPan(currentZoomRef.value)
+                            val nextPanX = (panStartX + dx / currentZoomRef.value).coerceIn(-maxPan, maxPan)
+                            val nextPanY = (panStartY + dy / currentZoomRef.value).coerceIn(-maxPan, maxPan)
+                            previewView.translationX = nextPanX
+                            previewView.translationY = nextPanY
+                            onPanChange(nextPanX, nextPanY)
                         }
                     }
 
@@ -236,6 +269,8 @@ private fun CameraPreview(
 
                     camera = cameraProvider.bindToLifecycle(lifecycleOwner, selector, preview)
                     camera?.cameraControl?.setZoomRatio(currentZoom.coerceIn(1f, 5f))
+                    previewView.translationX = panX
+                    previewView.translationY = panY
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -249,6 +284,10 @@ private fun CameraPreview(
 
 private const val DOUBLE_TAP_THRESHOLD_MS = 250L
 
+private fun getMaxPan(currentZoom: Float): Float {
+    return 600f * (currentZoom - 1f).coerceAtLeast(0f)
+}
+
 private fun getDistance(event: MotionEvent): Float {
     val x1 = event.getX(0)
     val y1 = event.getY(0)
@@ -258,3 +297,4 @@ private fun getDistance(event: MotionEvent): Float {
     val dy = y2 - y1
     return sqrt((dx * dx + dy * dy).toDouble()).toFloat()
 }
+
