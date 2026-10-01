@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,7 +37,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberPermissionState
-import androidx.compose.material3.Icon
 import androidx.activity.ComponentActivity
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
@@ -47,7 +47,6 @@ fun CameraScreen() {
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var menuExpanded by remember { mutableStateOf(false) }
-    var currentCameraLabel by remember { mutableStateOf("Caméra arrière") }
 
     LaunchedEffect(Unit) {
         cameraPermissionState.launchPermissionRequest()
@@ -76,7 +75,6 @@ fun CameraScreen() {
                             text = { Text("Caméra avant") },
                             onClick = {
                                 lensFacing = CameraSelector.LENS_FACING_FRONT
-                                currentCameraLabel = "Caméra avant"
                                 menuExpanded = false
                             }
                         )
@@ -84,7 +82,6 @@ fun CameraScreen() {
                             text = { Text("Caméra arrière") },
                             onClick = {
                                 lensFacing = CameraSelector.LENS_FACING_BACK
-                                currentCameraLabel = "Caméra arrière"
                                 menuExpanded = false
                             }
                         )
@@ -104,35 +101,38 @@ fun CameraScreen() {
             )
 
             // Flux vidéo en temps réel
-            AndroidView(
-                factory = { context ->
-                    val previewView = PreviewView(context)
-                    val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+            // Utilisation de 'key' pour forcer la recréation du composant lors du changement de caméra
+            key(lensFacing) {
+                AndroidView(
+                    factory = { context ->
+                        val previewView = PreviewView(context)
+                        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
-                    cameraProviderFuture.addListener({
-                        val cameraProvider = cameraProviderFuture.get()
-                        val preview = Preview.Builder().build().also {
-                            it.setSurfaceProvider(previewView.surfaceProvider)
-                        }
+                        cameraProviderFuture.addListener({
+                            try {
+                                val cameraProvider = cameraProviderFuture.get()
+                                val preview = Preview.Builder().build().also {
+                                    it.setSurfaceProvider(previewView.surfaceProvider)
+                                }
 
-                        val cameraSelector = CameraSelector.Builder()
-                            .requireLensFacing(lensFacing)
-                            .build()
+                                val cameraSelector = CameraSelector.Builder()
+                                    .requireLensFacing(lensFacing)
+                                    .build()
 
-                        try {
-                            cameraProvider.unbindAll()
-                            cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-                    }, ContextCompat.getMainExecutor(context))
+                                cameraProvider.unbindAll()
+                                cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }, ContextCompat.getMainExecutor(context))
 
-                    previewView
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            )
+                        previewView
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                )
+            }
         }
     } else {
         Column(
