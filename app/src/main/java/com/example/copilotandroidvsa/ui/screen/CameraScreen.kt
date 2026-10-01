@@ -163,12 +163,14 @@ private fun CameraPreview(
                 implementationMode = PreviewView.ImplementationMode.PERFORMANCE
             }
 
+            val currentZoomRef = mutableStateOf(currentZoom)
+
             previewView.setOnTouchListener { _, event ->
                 when (event.actionMasked) {
                     MotionEvent.ACTION_POINTER_DOWN -> {
                         if (event.pointerCount >= 2) {
                             pinchStartDistance = getDistance(event)
-                            startZoom = currentZoom
+                            startZoom = currentZoomRef.value
                         }
                     }
 
@@ -179,6 +181,7 @@ private fun CameraPreview(
                                 val factor = distance / pinchStartDistance
                                 val nextZoom = (startZoom * factor).coerceIn(1f, 5f)
                                 camera?.cameraControl?.setZoomRatio(nextZoom)
+                                currentZoomRef.value = nextZoom
                                 onZoomChange(nextZoom)
                             }
                         }
@@ -217,10 +220,6 @@ private fun CameraPreview(
         },
         modifier = modifier
     )
-
-    DisposableEffect(lensFacing) {
-        onDispose { }
-    }
 }
 
 private fun getDistance(event: MotionEvent): Float {
