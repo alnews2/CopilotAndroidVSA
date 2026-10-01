@@ -27,11 +27,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -155,6 +155,7 @@ private fun CameraPreview(
     var camera by remember { mutableStateOf<Camera?>(null) }
     var pinchStartDistance by remember { mutableStateOf(0f) }
     var startZoom by remember { mutableFloatStateOf(1f) }
+    var lastTapTime by remember { mutableLongStateOf(0L) }
 
     AndroidView(
         factory = { context ->
@@ -167,6 +168,17 @@ private fun CameraPreview(
 
             previewView.setOnTouchListener { _, event ->
                 when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        if (event.eventTime - lastTapTime < DOUBLE_TAP_THRESHOLD_MS && event.pointerCount == 1) {
+                            val resetZoom = 1f
+                            camera?.cameraControl?.setZoomRatio(resetZoom)
+                            currentZoomRef.value = resetZoom
+                            onZoomChange(resetZoom)
+                            lastTapTime = 0L
+                            return@setOnTouchListener true
+                        }
+                    }
+
                     MotionEvent.ACTION_POINTER_DOWN -> {
                         if (event.pointerCount >= 2) {
                             pinchStartDistance = getDistance(event)
@@ -187,7 +199,20 @@ private fun CameraPreview(
                         }
                     }
 
-                    MotionEvent.ACTION_UP,
+                    MotionEvent.ACTION_UP -> {
+                        if (event.pointerCount == 1) {
+                            val now = event.eventTime
+                            if (now - lastTapTime < DOUBLE_TAP_THRESHOLD_MS) {
+                                val resetZoom = 1f
+                                camera?.cameraControl?.setZoomRatio(resetZoom)
+                                currentZoomRef.value = resetZoom
+                                onZoomChange(resetZoom)
+                            }
+                            lastTapTime = now
+                        }
+                        pinchStartDistance = 0f
+                    }
+
                     MotionEvent.ACTION_CANCEL -> {
                         pinchStartDistance = 0f
                     }
@@ -221,6 +246,8 @@ private fun CameraPreview(
         modifier = modifier
     )
 }
+
+private const val DOUBLE_TAP_THRESHOLD_MS = 250L
 
 private fun getDistance(event: MotionEvent): Float {
     val x1 = event.getX(0)
