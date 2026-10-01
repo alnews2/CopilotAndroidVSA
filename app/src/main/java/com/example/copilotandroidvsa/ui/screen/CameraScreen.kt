@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -62,75 +61,73 @@ fun CameraScreen() {
     }
 
     if (cameraPermissionState.hasPermission) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            TopAppBar(
-                title = { Text("Caméra") },
-                actions = {
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Menu",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Caméra avant") },
-                            onClick = {
-                                lensFacing = CameraSelector.LENS_FACING_FRONT
-                                menuExpanded = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Caméra arrière") },
-                            onClick = {
-                                lensFacing = CameraSelector.LENS_FACING_BACK
-                                menuExpanded = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Quitter") },
-                            onClick = {
-                                menuExpanded = false
-                                (context as? ComponentActivity)?.finish()
-                            }
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-
+            // Vidéo en arrière-plan, toujours visible
             if (isLandscape) {
-                Box(
+                CameraPreview(
+                    lensFacing = lensFacing,
+                    lifecycleOwner = lifecycleOwner,
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CameraPreview(
-                        lensFacing = lensFacing,
-                        lifecycleOwner = lifecycleOwner,
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth()
-                    )
-                }
+                )
             } else {
                 CameraPreview(
                     lensFacing = lensFacing,
                     lifecycleOwner = lifecycleOwner,
                     modifier = Modifier
                         .fillMaxSize()
+                )
+            }
+
+            // Barre de contrôle toujours visible au-dessus de la caméra
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                TopAppBar(
+                    title = { Text("Caméra") },
+                    actions = {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "Menu",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Caméra avant") },
+                                onClick = {
+                                    lensFacing = CameraSelector.LENS_FACING_FRONT
+                                    menuExpanded = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Caméra arrière") },
+                                onClick = {
+                                    lensFacing = CameraSelector.LENS_FACING_BACK
+                                    menuExpanded = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Quitter") },
+                                onClick = {
+                                    menuExpanded = false
+                                    (context as? ComponentActivity)?.finish()
+                                }
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 )
             }
         }
