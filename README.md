@@ -4,9 +4,12 @@ Application Android avec sélection de caméra (avant/arrière) et flux vidéo e
 
 ## Fonctionnalités
 
-- ✅ Sélection caméra avant/arrière
+- ✅ Menu trois points (⋮) pour :
+  - Sélectionner la caméra avant
+  - Sélectionner la caméra arrière
+  - Quitter l'application
 - ✅ Flux vidéo en temps réel avec CameraX
-- ✅ Interface Material Design 3
+- ✅ Interface Material Design 3 avec TopAppBar
 - ✅ Gestion des permissions
 - ✅ Tests automatiques (unitaires et instrumentés)
 - ✅ Architecture MVC
@@ -54,15 +57,18 @@ app/
 - **CameraX** : `androidx.camera:camera-core`, `camera-camera2`, `camera-lifecycle`, `camera-view`
 - **Jetpack Compose** : UI déclarative
 - **Accompanist Permissions** : Gestion simplifiée des permissions
-- **Material Design 3** : Design system
+- **Material Design 3** : Design system avec TopAppBar
 
 ## Utilisation
 
 1. Lancer l'application
 2. Accepter la permission caméra
 3. Voir le flux vidéo en temps réel de la caméra arrière
-4. Cliquer sur l'icône de basculement pour passer à la caméra avant
-5. Cliquer à nouveau pour revenir à la caméra arrière
+4. Cliquer sur le menu trois points (⋮) en haut à droite
+5. Sélectionner :
+   - **Caméra avant** : pour basculer vers la caméra frontale
+   - **Caméra arrière** : pour revenir à la caméra arrière
+   - **Quitter** : pour fermer l'application
 
 ## Tests
 

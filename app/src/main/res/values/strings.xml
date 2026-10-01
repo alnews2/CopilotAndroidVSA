@@ -3,5 +3,6 @@
     <string name="camera_permission_denied">Permission caméra refusée</string>
     <string name="camera_front">Caméra avant</string>
     <string name="camera_rear">Caméra arrière</string>
-    <string name="switch_camera">Basculer caméra</string>
+    <string name="menu_camera">Caméra</string>
+    <string name="menu_exit">Quitter</string>
 </resources>
