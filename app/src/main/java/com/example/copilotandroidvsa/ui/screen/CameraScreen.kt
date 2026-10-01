@@ -69,13 +69,15 @@ fun CameraScreen() {
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            CameraPreview(
-                lensFacing = lensFacing,
-                lifecycleOwner = lifecycleOwner,
-                currentZoom = currentZoom,
-                onZoomChange = { currentZoom = it },
-                modifier = Modifier.fillMaxSize()
-            )
+            key(lensFacing) {
+                CameraPreview(
+                    lensFacing = lensFacing,
+                    lifecycleOwner = lifecycleOwner,
+                    currentZoom = currentZoom,
+                    onZoomChange = { currentZoom = it },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
             TopAppBar(
                 title = { Text("Caméra") },
@@ -152,14 +154,7 @@ private fun CameraPreview(
 ) {
     var camera by remember { mutableStateOf<Camera?>(null) }
     var pinchStartDistance by remember { mutableStateOf(0f) }
-    var initialZoom by remember { mutableFloatStateOf(1f) }
-
-    DisposableEffect(lensFacing) {
-        if (camera != null) {
-            camera?.cameraControl?.setZoomRatio(currentZoom.coerceIn(1f, 5f))
-        }
-        onDispose { }
-    }
+    var startZoom by remember { mutableFloatStateOf(1f) }
 
     AndroidView(
         factory = { context ->
@@ -173,7 +168,7 @@ private fun CameraPreview(
                     MotionEvent.ACTION_POINTER_DOWN -> {
                         if (event.pointerCount >= 2) {
                             pinchStartDistance = getDistance(event)
-                            initialZoom = currentZoom
+                            startZoom = currentZoom
                         }
                     }
 
@@ -182,7 +177,7 @@ private fun CameraPreview(
                             val distance = getDistance(event)
                             if (pinchStartDistance > 0f && distance > 0f) {
                                 val factor = distance / pinchStartDistance
-                                val nextZoom = (initialZoom * factor).coerceIn(1f, 5f)
+                                val nextZoom = (startZoom * factor).coerceIn(1f, 5f)
                                 camera?.cameraControl?.setZoomRatio(nextZoom)
                                 onZoomChange(nextZoom)
                             }
@@ -198,10 +193,11 @@ private fun CameraPreview(
             }
 
             val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-
             cameraProviderFuture.addListener({
                 try {
                     val cameraProvider = cameraProviderFuture.get()
+                    cameraProvider.unbindAll()
+
                     val preview = Preview.Builder().build().also {
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
@@ -221,6 +217,10 @@ private fun CameraPreview(
         },
         modifier = modifier
     )
+
+    DisposableEffect(lensFacing) {
+        onDispose { }
+    }
 }
 
 private fun getDistance(event: MotionEvent): Float {
