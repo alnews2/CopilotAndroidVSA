@@ -112,7 +112,7 @@ fun CameraScreen() {
                             text = { Text("Quitter") },
                             onClick = {
                                 menuExpanded = false
-                                (context as? ComponentActivity)?.finish()
+                                closeApp(context)
                             }
                         )
                     }
@@ -141,6 +141,14 @@ fun CameraScreen() {
                 Text("Activer la caméra")
             }
         }
+    }
+}
+
+private fun closeApp(context: android.content.Context) {
+    val activity = context as? ComponentActivity
+    activity?.let {
+        it.finishAffinity()
+        it.finishAndRemoveTask()
     }
 }
 
