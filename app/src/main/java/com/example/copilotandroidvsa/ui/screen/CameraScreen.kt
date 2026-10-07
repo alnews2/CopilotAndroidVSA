@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -58,6 +59,7 @@ fun CameraScreen() {
     var lensFacing by rememberSaveable { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var menuExpanded by remember { mutableStateOf(false) }
     var currentZoom by rememberSaveable { mutableFloatStateOf(1f) }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
     LaunchedEffect(Unit) {
         cameraPermissionState.launchPermissionRequest()
@@ -75,6 +77,7 @@ fun CameraScreen() {
                     lifecycleOwner = lifecycleOwner,
                     currentZoom = currentZoom,
                     onZoomChange = { currentZoom = it },
+                    onCameraProviderReady = { cameraProvider = it },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -112,7 +115,7 @@ fun CameraScreen() {
                             text = { Text("Quitter") },
                             onClick = {
                                 menuExpanded = false
-                                closeApp(context)
+                                closeApp(context, cameraProvider)
                             }
                         )
                     }
@@ -144,11 +147,19 @@ fun CameraScreen() {
     }
 }
 
-private fun closeApp(context: android.content.Context) {
+private fun closeApp(context: android.content.Context, cameraProvider: ProcessCameraProvider?) {
+    cameraProvider?.unbindAll()
+
     val activity = context as? ComponentActivity
     activity?.let {
         it.finishAffinity()
         it.finishAndRemoveTask()
+    }
+
+    try {
+        Runtime.getRuntime().exit(0)
+    } catch (_: Throwable) {
+        // ignore: Android can reject forced shutdown in normal app flow
     }
 }
 
@@ -158,12 +169,21 @@ private fun CameraPreview(
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
     currentZoom: Float,
     onZoomChange: (Float) -> Unit,
+    onCameraProviderReady: (ProcessCameraProvider) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var camera by remember { mutableStateOf<Camera?>(null) }
     var pinchStartDistance by remember { mutableStateOf(0f) }
     var startZoom by remember { mutableFloatStateOf(1f) }
     var lastTapTime by remember { mutableLongStateOf(0L) }
+    val cameraProviderState = remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraProviderState.value?.unbindAll()
+            camera = null
+        }
+    }
 
     AndroidView(
         factory = { context ->
@@ -232,6 +252,8 @@ private fun CameraPreview(
             cameraProviderFuture.addListener({
                 try {
                     val cameraProvider = cameraProviderFuture.get()
+                    cameraProviderState.value = cameraProvider
+                    onCameraProviderReady(cameraProvider)
                     cameraProvider.unbindAll()
 
                     val preview = Preview.Builder().build().also {
